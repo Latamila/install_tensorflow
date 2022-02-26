@@ -1,0 +1,128 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers
+
+data = np.array([[0.1, 0.2, 0.3], [0.8, 0.9, 1.0], [1.5, 1.6, 1.7],])
+layer = layers.Normalization()
+layer.adapt(data)
+normalized_data = layer(data)
+
+print("Features mean: %.2f" % (normalized_data.numpy().mean()))
+print("Features std: %.2f" % (normalized_data.numpy().std()))
+
+data = [
+    'Paguei o upgrade de cabine,'
+    'o e-mail avisando só veio tarde da noite de domingo,'
+    'embarquei na manhã de segunda-feira e tanto os comissários de terra quanto os de bordo da LATAM'
+    'não me avisaram de que meu lance havia sido contemplado,'
+    'demonstrando desorganização. Foi a primeira e espero que seja a última vez.'
+]
+layer = layers.TextVectorization()
+layer.adapt(data)
+vectorized_text = layer(data)
+print(vectorized_text)
+
+#Além disso, as camadas adaptáveis ​​sempre expõem uma opção para definir o estado diretamente por meio de argumentos do construtor ou atribuição de peso. 
+#Se os valores de estado pretendidos são conhecidos no tempo de construção da camada, ou são calculadas fora da adapt() chamada, que pode ser ajustado, 
+#sem depender de computação interna da camada. Por exemplo, se arquivos de vocabulário externo para os TextVectorization , StringLookup , 
+#ou IntegerLookup camadas já existem, aqueles que podem ser carregados diretamente nas tabelas de pesquisa por meio de um caminho para o arquivo 
+#de vocabulário em argumentos do construtor da camada.
+
+#Aqui está um exemplo em que instanciar um StringLookup camada com vocabulário pré-computados:
+
+vocab = ["a", "b", "c", "d"]
+data = tf.constant([["a", "c", "d"], ["d", "z", "b"]])
+layer = layers.StringLookup(vocabulary=vocab)
+vectorized_data = layer(data)
+print(vectorized_data)
+
+#aplicá-lo ao seu tf.data.Dataset , de modo a obter um conjunto de dados que produz lotes de dados pré-processados, como este:
+
+tf.data.Dataset
+dataset = dataset.map(lambda x, y: (preprocessing_layer(x), y))
+
+#Codificação de recursos categóricos de string por meio de codificação one-hot
+# Define some toy data
+data = tf.constant([["a"], ["b"], ["c"], ["b"], ["c"], ["a"]])
+
+# Use StringLookup to build an index of the feature values and encode output.
+
+lookup = layers.StringLookup(output_mode="one_hot")
+lookup.adapt(data)
+
+# Convert new test data (which includes unknown feature values)
+
+test_data = tf.constant([["a"], ["b"], ["c"], ["d"], ["e"], [""]])
+
+test_data = tf.constant([data])
+encoded_data = lookup(test_data)
+
+
+#Aplicando o truque de hashing a um recurso categórico de número inteiro
+
+# Sample data: 10,000 random integers with values between 0 and 100,000
+data = np.random.randint(0, 100000, size=(10000, 1))
+
+# Use the Hashing layer to hash the values to the range [0, 64]
+hasher = layers.Hashing(num_bins=64, salt=1337)
+
+# Use the CategoryEncoding layer to multi-hot encode the hashed values
+encoder = layers.CategoryEncoding(num_tokens=64, output_mode="multi_hot")
+encoded_data = encoder(hasher(data))
+print(encoded_data.shape)
+
+
+#Codificando texto como uma sequência de índices de token
+
+# Define some text data to adapt the layer
+adapt_data = tf.constant(
+    [
+        "The Brain is wider than the Sky",
+        "For put them side by side",
+        "The one the other will contain",
+        "With ease and You beside",
+    ]
+)
+
+# Create a TextVectorization layer
+text_vectorizer = layers.TextVectorization(output_mode="int")
+# Index the vocabulary via `adapt()`
+text_vectorizer.adapt(adapt_data)
+
+# Try out the layer
+print(
+    "Encoded text:\n", text_vectorizer(["The Brain is deeper than the sea"]).numpy(),
+)
+
+# Create a simple model
+inputs = keras.Input(shape=(None,), dtype="int64")
+x = layers.Embedding(input_dim=text_vectorizer.vocabulary_size(), output_dim=16)(inputs)
+x = layers.GRU(8)(x)
+outputs = layers.Dense(1)(x)
+model = keras.Model(inputs, outputs)
+
+# Create a labeled dataset (which includes unknown tokens)
+train_dataset = tf.data.Dataset.from_tensor_slices(
+    (["The Brain is deeper than the sea", "for if they are held Blue to Blue"], [1, 0])
+)
+
+# Preprocess the string inputs, turning them into int sequences
+train_dataset = train_dataset.batch(2).map(lambda x, y: (text_vectorizer(x), y))
+# Train the model on the int sequences
+print("\nTraining model...")
+model.compile(optimizer="rmsprop", loss="mse")
+model.fit(train_dataset)
+
+# For inference, you can export a model that accepts strings as input
+inputs = keras.Input(shape=(1,), dtype="string")
+x = text_vectorizer(inputs)
+outputs = model(x)
+end_to_end_model = keras.Model(inputs, outputs)
+
+# Call the end-to-end model on test data (which includes unknown tokens)
+print("\nCalling end-to-end model on test string...")
+test_data = tf.constant(["The one the other will absorb"])
+test_output = end_to_end_model(test_data)
+print("Model output:", test_output)
+encoded_data = lookup(test_data)
+print(encoded_data)
